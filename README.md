@@ -1,77 +1,177 @@
-# WES_Pipeline
-# Whole Exome Sequencing (WES) Human Pipeline
+ #!/bin/bash
+###################################################### VARIANT CALLING STEPS ####################################################################
+# directories
+ref="/home/progenics2023/NGS_test/hg38.fa"
+known_sites="/home/progenics2023/NGS_test/Homo_sapiens_assembly38.dbsnp138.vcf"
+aligned_reads="/home/progenics2023/NGS_test/aligned_reads"
+reads="/home/progenics2023/NGS_test/reads"
+trimmed_reads="/home/progenics2023/NGS_test/reads/trimmed_reads"
+results="/home/progenics2023/NGS_test/results"
+data="/home/progenics2023/NGS_test/data"
 
-## **Overview**
-This repository contains a bioinformatics pipeline for analyzing Whole Exome Sequencing (WES) data of human samples. The pipeline is designed for accurate variant calling, annotation, and quality control using industry-standard tools such as **BWA-MEM, GATK4, Samtools, and FastQC**. 
+# ------------------
+# STEP 1: QC - Run fastqc 
+# -------------------
+echo "STEP 1: QC - Run fastqc"
+fastqc ${reads}/PG250425111536_R1_001.fastq.gz -o ${reads}/
+fastqc ${reads}/PG250425111536_R2_001.fastq.gz -o ${reads}/
 
-The pipeline is built to handle **paired-end Illumina reads (2 × 100 bp or 150 bp)** and follows GATK Best Practices for germline variant discovery.
 
----
+# ------------------
+# STEP 2: Trimming
+# -------------------
+echo "Step 2: Trimming the adapter"
 
-## **Pipeline Workflow**
-The pipeline consists of the following steps:
+R1="/home/progenics2023/NGS_test/reads/PG250425111536_R1_001.fastq.gz"     
+R2="/home/progenics2023/NGS_test/reads/PG250425111536_R2_001.fastq.gz"      
+output="/home/progenics2023/NGS_test/reads/trimmed_reads"
+CPU_CORES=4
 
-1. **Quality Control (QC)**
-   - Tool: FastQC / MultiQC
-   - Purpose: Assess raw FASTQ read quality (e.g., adapter contamination, GC content).
+adapter1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+adapter2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
 
-2. **Read Trimming (Optional)**
-   - Tool: Trimmomatic or fastp
-   - Purpose: Remove low-quality bases and adapters.
 
-3. **Alignment**
-   - Tool: BWA-MEM
-   - Input: Cleaned FASTQ reads
-   - Output: Aligned BAM file.
+trimmed_R1="${output}/$(basename $R1 .fastq.gz)_trimmed.fastq.gz"
+trimmed_R2="${output}/$(basename $R2 .fastq.gz)_trimmed.fastq.gz"
+report_file="${output}/cutadapt_report.txt"
 
-4. **Post-Alignment Processing**
-   - Sorting and indexing (Samtools)
-   - Marking duplicates (Picard or GATK MarkDuplicates)
-   - Base quality score recalibration (BQSR) using GATK.
+echo "Starting trimming process..."
+echo "  Read 1: $R1"
+echo "  Read 2: $R2"
 
-5. **Variant Calling**
-   - Tool: GATK HaplotypeCaller (GVCF mode)
-   - Output: Raw variant calls (VCF files).
+cutadapt \
+  -g $adapter1 \
+  -G $adapter2 \
+  -o $trimmed_R1 \
+  -p $trimmed_R2 \
+  -j $CPU_CORES \
+  --minimum-length 20 \
+  $R1 $R2 > $report_file
 
-6. **Variant Filtering**
-   - Apply GATK Variant Quality Score Recalibration (VQSR) or hard filtering.
+echo "Trimming complete!"
+echo "Results saved in: $output"
+echo "Trimmed files:"
+echo "  $trimmed_R1"
+echo "  $trimmed_R2"
+echo "Report: $report_file"
 
-7. **Variant Annotation**
-   - Tool: Annovar, SnpEff, or VEP
-   - Output: Annotated VCF with functional impact predictions.
+# ------------------
+# STEP 3: QC - Run fastqc 
+# -------------------
+echo "STEP 3: QC - Run fastqc"
+fastqc ${trimmed_reads}/PG250425111536_R1_001_trimmed.fastq.gz -o ${reads}/
+fastqc ${trimmed_reads}/PG250425111536_R2_001_trimmed.fastq.gz -o ${reads}/
 
-8. **Coverage Analysis (Optional)**
-   - Tool: mosdepth or bedtools
-   - Generate per-target or per-gene coverage statistics.
+# --------------------------------------
+# STEP 4: Map to reference using BWA-MEM
+# --------------------------------------
 
----
+echo "STEP 4: Map to reference using BWA-MEM"
 
-## **Repository Contents**
-- `wes_pipeline.sh` – Main pipeline script (bash).
-- `requirements.txt` – List of software/tools needed.
-- `config/` – Configuration files (e.g., reference genome, BED targets).
-- `example_data/` – Example FASTQ or test dataset (if available).
-- `README.md` – This documentation.
+# BWA index reference 
+#bwa index ${ref}
 
----
 
-## **Requirements**
-- **OS:** Linux (tested on Ubuntu/WSL)
-- **Tools:**
-  - BWA
-  - Samtools
-  - GATK4
-  - Picard
-  - FastQC, MultiQC
-  - bcftools
-  - Python 3 / R (for downstream analysis)
-  
-Reference genome: **hg38 (or hg19)** with .fa, .fai, and .dict files.
+# BWA alignment
+bwa mem -t 4 -R "@RG\tID:PG250425111536\tPL:ILLUMINA\tSM:PG250425111536" ${ref} ${trimmed_reads}/PG250425111536_R1_001_trimmed.fastq.gz ${trimmed_reads}/PG250425111536_R2_001_trimmed.fastq.gz > ${aligned_reads}/PG250425111536.paired.sam
 
----
 
-## **Usage**
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/<your-username>/WES_Pipeline.git
-   cd WES_Pipeline
+# -----------------------------------------
+# STEP 5: Mark Duplicates and Sort - GATK4
+# -----------------------------------------
+
+echo "STEP 5: Mark Duplicates and Sort - GATK4"
+
+gatk MarkDuplicatesSpark -I ${aligned_reads}/PG250425111536.paired.sam -O ${aligned_reads}/PG250425111536_sorted_dedup_reads.bam
+
+# ----------------------------------
+# STEP 6: Base quality recalibration
+# ----------------------------------
+
+
+echo "STEP 6: Base quality recalibration"
+
+# 1. build the model
+gatk BaseRecalibrator -I ${aligned_reads}/PG250425111536_sorted_dedup_reads.bam -R ${ref} --known-sites ${known_sites} -O ${data}/recal_data.table
+
+
+# 2. Apply the model to adjust the base quality scores
+gatk ApplyBQSR -I ${aligned_reads}/PG250425111536_sorted_dedup_reads.bam -R ${ref} --bqsr-recal-file ${data}/recal_data.table -O ${aligned_reads}/PG250425111536_sorted_dedup_bqsr_reads.bam 
+
+# -----------------------------------------------
+# STEP 7: Collect Alignment & Insert Size Metrics
+# -----------------------------------------------
+
+
+echo "STEP 7: Collect Alignment & Insert Size Metrics"
+
+gatk CollectAlignmentSummaryMetrics R=${ref} I=${aligned_reads}/PG250425111536_sorted_dedup_reads.bam O=${aligned_reads}/alignment_metrics.txt
+gatk CollectInsertSizeMetrics INPUT=${aligned_reads}/PG250425111536_sorted_dedup_bqsr_reads.bam OUTPUT=${aligned_reads}/insert_size_metrics.txt HISTOGRAM_FILE=${aligned_reads}/insert_size_histogram.pdf
+
+# ----------------------------------------------
+# STEP 8: Call Variants - gatk haplotype caller
+# ----------------------------------------------
+
+echo "STEP 8: Call Variants - gatk haplotype caller"
+
+gatk HaplotypeCaller -R ${ref} -I ${aligned_reads}/PG250425111536_sorted_dedup_bqsr_reads.bam -O ${results}/PG250425111536_raw_variants.vcf
+
+
+
+# extract SNPs & INDELS
+
+gatk SelectVariants -R ${ref} -V ${results}/PG250425111536_raw_variants.vcf --select-type SNP -O ${results}/PG250425111536_raw_snps.vcf
+gatk SelectVariants -R ${ref} -V ${results}/PG250425111536_raw_variants.vcf --select-type INDEL -O ${results}/PG250425111536_raw_indels.vcf
+
+
+# ----------------------------------------
+# STEP 9: Variant Filtering - SNPs & INDELs
+# ----------------------------------------
+
+echo "STEP 9: Variant Filtering - SNPs & INDELs"
+
+# Filter SNPs
+gatk VariantFiltration \
+ -R ${ref} \
+ -V ${results}/PG250425111536_raw_snps.vcf \
+ --filter-expression "QD < 2.0" --filter-name "QD2" \
+ --filter-expression "FS > 60.0" --filter-name "FS60" \
+ --filter-expression "MQ < 40.0" --filter-name "MQ40" \
+ --filter-expression "QUAL < 30.0" --filter-name "LowQual" \
+ -O ${results}/PG250425111536_filtered_snps.vcf
+
+# Filter INDELs
+gatk VariantFiltration \
+ -R ${ref} \
+ -V ${results}/PG250425111536_raw_indels.vcf \
+ --filter-expression "QD < 2.0" --filter-name "QD2" \
+ --filter-expression "FS > 200.0" --filter-name "FS200" \
+ --filter-expression "QUAL < 30.0" --filter-name "LowQual" \
+ -O ${results}/PG250425111536_filtered_indels.vcf
+
+
+# ----------------------------
+# STEP 10: Merge VCFs
+# ----------------------------
+
+echo "STEP 10: Merge SNP & INDEL VCFs"
+
+gatk MergeVcfs \
+ -I ${results}/PG250425111536_filtered_snps.vcf \
+ -I ${results}/PG250425111536_filtered_indels.vcf \
+ -O ${results}/PG250425111536_filtered_all.vcf
+
+
+# ----------------------------------------
+# STEP 11: Extract only PASS variants
+# ----------------------------------------
+
+echo "STEP 11: Extract only PASS variants"
+
+# Ensure bcftools is installed and accessible
+bcftools view -f PASS ${results}/PG250425111536_filtered_all.vcf -o ${results}/PG250425111536_final_PASS_variants.vcf
+
+echo "Filtering complete. Final PASS variants saved at:"
+echo "${results}/final_PASS_variants.vcf"
+
+echo "WES pipeline completed successfully!"
