@@ -22,8 +22,8 @@ fastqc ${reads}/Yoursample_R2_001.fastq.gz -o ${reads}/
 # -------------------
 echo "Step 2: Trimming the adapter"
 
-R1="/home/Ravi2023/NGS_test/reads/PG250425111536_R1_001.fastq.gz"     
-R2="/home/Ravi2023/NGS_test/reads/PG250425111536_R2_001.fastq.gz"      
+R1="/home/Ravi2023/NGS_test/reads/Yoursample_R1_001.fastq.gz"     
+R2="/home/Ravi2023/NGS_test/reads/Yoursample_R2_001.fastq.gz"      
 output="/home/Ravi2023/NGS_test/reads/trimmed_reads"
 CPU_CORES=4
 
