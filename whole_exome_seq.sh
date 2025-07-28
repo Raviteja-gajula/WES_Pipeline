@@ -1,20 +1,20 @@
  #!/bin/bash
 ###################################################### VARIANT CALLING STEPS ####################################################################
 # directories
-ref="/home/progenics2023/NGS_test/hg38.fa"
-known_sites="/home/progenics2023/NGS_test/Homo_sapiens_assembly38.dbsnp138.vcf"
-aligned_reads="/home/progenics2023/NGS_test/aligned_reads"
-reads="/home/progenics2023/NGS_test/reads"
-trimmed_reads="/home/progenics2023/NGS_test/reads/trimmed_reads"
-results="/home/progenics2023/NGS_test/results"
-data="/home/progenics2023/NGS_test/data"
+ref="/home/Ravi2023/NGS_test/hg38.fa"
+known_sites="/home/Ravi2023/NGS_test/Homo_sapiens_assembly38.dbsnp138.vcf"
+aligned_reads="/home/Ravi2023/NGS_test/aligned_reads"
+reads="/home/Ravi2023/NGS_test/reads"
+trimmed_reads="/home/Ravi2023/NGS_test/reads/trimmed_reads"
+results="/home/Ravi2023/NGS_test/results"
+data="/home/Ravi2023/NGS_test/data"
 
 # ------------------
 # STEP 1: QC - Run fastqc 
 # -------------------
 echo "STEP 1: QC - Run fastqc"
-fastqc ${reads}/PG250425111536_R1_001.fastq.gz -o ${reads}/
-fastqc ${reads}/PG250425111536_R2_001.fastq.gz -o ${reads}/
+fastqc ${reads}/Yoursample_R1_001.fastq.gz -o ${reads}/
+fastqc ${reads}/Yoursample_R2_001.fastq.gz -o ${reads}/
 
 
 # ------------------
@@ -22,9 +22,9 @@ fastqc ${reads}/PG250425111536_R2_001.fastq.gz -o ${reads}/
 # -------------------
 echo "Step 2: Trimming the adapter"
 
-R1="/home/progenics2023/NGS_test/reads/PG250425111536_R1_001.fastq.gz"     
-R2="/home/progenics2023/NGS_test/reads/PG250425111536_R2_001.fastq.gz"      
-output="/home/progenics2023/NGS_test/reads/trimmed_reads"
+R1="/home/Ravi2023/NGS_test/reads/PG250425111536_R1_001.fastq.gz"     
+R2="/home/Ravi2023/NGS_test/reads/PG250425111536_R2_001.fastq.gz"      
+output="/home/Ravi2023/NGS_test/reads/trimmed_reads"
 CPU_CORES=4
 
 adapter1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
@@ -59,8 +59,8 @@ echo "Report: $report_file"
 # STEP 3: QC - Run fastqc 
 # -------------------
 echo "STEP 3: QC - Run fastqc"
-fastqc ${trimmed_reads}/PG250425111536_R1_001_trimmed.fastq.gz -o ${reads}/
-fastqc ${trimmed_reads}/PG250425111536_R2_001_trimmed.fastq.gz -o ${reads}/
+fastqc ${trimmed_reads}/Yoursample_R1_001_trimmed.fastq.gz -o ${reads}/
+fastqc ${trimmed_reads}/Yoursample_R2_001_trimmed.fastq.gz -o ${reads}/
 
 # --------------------------------------
 # STEP 4: Map to reference using BWA-MEM
@@ -73,7 +73,7 @@ echo "STEP 4: Map to reference using BWA-MEM"
 
 
 # BWA alignment
-bwa mem -t 4 -R "@RG\tID:PG250425111536\tPL:ILLUMINA\tSM:PG250425111536" ${ref} ${trimmed_reads}/PG250425111536_R1_001_trimmed.fastq.gz ${trimmed_reads}/PG250425111536_R2_001_trimmed.fastq.gz > ${aligned_reads}/PG250425111536.paired.sam
+bwa mem -t 4 -R "@RG\tID:Yoursample\tPL:ILLUMINA\tSM:Yoursample" ${ref} ${trimmed_reads}/Yoursample_R1_001_trimmed.fastq.gz ${trimmed_reads}/Yoursample_R2_001_trimmed.fastq.gz > ${aligned_reads}/PG250425111536.paired.sam
 
 
 # -----------------------------------------
@@ -82,7 +82,7 @@ bwa mem -t 4 -R "@RG\tID:PG250425111536\tPL:ILLUMINA\tSM:PG250425111536" ${ref} 
 
 echo "STEP 5: Mark Duplicates and Sort - GATK4"
 
-gatk MarkDuplicatesSpark -I ${aligned_reads}/PG250425111536.paired.sam -O ${aligned_reads}/PG250425111536_sorted_dedup_reads.bam
+gatk MarkDuplicatesSpark -I ${aligned_reads}/Yoursample.paired.sam -O ${aligned_reads}/Yoursample_sorted_dedup_reads.bam
 
 # ----------------------------------
 # STEP 6: Base quality recalibration
@@ -92,11 +92,11 @@ gatk MarkDuplicatesSpark -I ${aligned_reads}/PG250425111536.paired.sam -O ${alig
 echo "STEP 6: Base quality recalibration"
 
 # 1. build the model
-gatk BaseRecalibrator -I ${aligned_reads}/PG250425111536_sorted_dedup_reads.bam -R ${ref} --known-sites ${known_sites} -O ${data}/recal_data.table
+gatk BaseRecalibrator -I ${aligned_reads}/Yoursample_sorted_dedup_reads.bam -R ${ref} --known-sites ${known_sites} -O ${data}/recal_data.table
 
 
 # 2. Apply the model to adjust the base quality scores
-gatk ApplyBQSR -I ${aligned_reads}/PG250425111536_sorted_dedup_reads.bam -R ${ref} --bqsr-recal-file ${data}/recal_data.table -O ${aligned_reads}/PG250425111536_sorted_dedup_bqsr_reads.bam 
+gatk ApplyBQSR -I ${aligned_reads}/Yoursample_sorted_dedup_reads.bam -R ${ref} --bqsr-recal-file ${data}/recal_data.table -O ${aligned_reads}/Yoursample_sorted_dedup_bqsr_reads.bam 
 
 # -----------------------------------------------
 # STEP 7: Collect Alignment & Insert Size Metrics
@@ -105,8 +105,8 @@ gatk ApplyBQSR -I ${aligned_reads}/PG250425111536_sorted_dedup_reads.bam -R ${re
 
 echo "STEP 7: Collect Alignment & Insert Size Metrics"
 
-gatk CollectAlignmentSummaryMetrics R=${ref} I=${aligned_reads}/PG250425111536_sorted_dedup_reads.bam O=${aligned_reads}/alignment_metrics.txt
-gatk CollectInsertSizeMetrics INPUT=${aligned_reads}/PG250425111536_sorted_dedup_bqsr_reads.bam OUTPUT=${aligned_reads}/insert_size_metrics.txt HISTOGRAM_FILE=${aligned_reads}/insert_size_histogram.pdf
+gatk CollectAlignmentSummaryMetrics R=${ref} I=${aligned_reads}/Yoursample_sorted_dedup_reads.bam O=${aligned_reads}/alignment_metrics.txt
+gatk CollectInsertSizeMetrics INPUT=${aligned_reads}/Yoursample_sorted_dedup_bqsr_reads.bam OUTPUT=${aligned_reads}/insert_size_metrics.txt HISTOGRAM_FILE=${aligned_reads}/insert_size_histogram.pdf
 
 # ----------------------------------------------
 # STEP 8: Call Variants - gatk haplotype caller
@@ -114,14 +114,14 @@ gatk CollectInsertSizeMetrics INPUT=${aligned_reads}/PG250425111536_sorted_dedup
 
 echo "STEP 8: Call Variants - gatk haplotype caller"
 
-gatk HaplotypeCaller -R ${ref} -I ${aligned_reads}/PG250425111536_sorted_dedup_bqsr_reads.bam -O ${results}/PG250425111536_raw_variants.vcf
+gatk HaplotypeCaller -R ${ref} -I ${aligned_reads}/Yoursample_sorted_dedup_bqsr_reads.bam -O ${results}/Yoursample_raw_variants.vcf
 
 
 
 # extract SNPs & INDELS
 
-gatk SelectVariants -R ${ref} -V ${results}/PG250425111536_raw_variants.vcf --select-type SNP -O ${results}/PG250425111536_raw_snps.vcf
-gatk SelectVariants -R ${ref} -V ${results}/PG250425111536_raw_variants.vcf --select-type INDEL -O ${results}/PG250425111536_raw_indels.vcf
+gatk SelectVariants -R ${ref} -V ${results}/Yoursample_raw_variants.vcf --select-type SNP -O ${results}/Yoursample_raw_snps.vcf
+gatk SelectVariants -R ${ref} -V ${results}/Yoursample_raw_variants.vcf --select-type INDEL -O ${results}/Yoursample_raw_indels.vcf
 
 
 # ----------------------------------------
@@ -133,21 +133,21 @@ echo "STEP 9: Variant Filtering - SNPs & INDELs"
 # Filter SNPs
 gatk VariantFiltration \
  -R ${ref} \
- -V ${results}/PG250425111536_raw_snps.vcf \
+ -V ${results}/Yoursample_raw_snps.vcf \
  --filter-expression "QD < 2.0" --filter-name "QD2" \
  --filter-expression "FS > 60.0" --filter-name "FS60" \
  --filter-expression "MQ < 40.0" --filter-name "MQ40" \
  --filter-expression "QUAL < 30.0" --filter-name "LowQual" \
- -O ${results}/PG250425111536_filtered_snps.vcf
+ -O ${results}/Yoursample_filtered_snps.vcf
 
 # Filter INDELs
 gatk VariantFiltration \
  -R ${ref} \
- -V ${results}/PG250425111536_raw_indels.vcf \
+ -V ${results}/Yoursample_raw_indels.vcf \
  --filter-expression "QD < 2.0" --filter-name "QD2" \
  --filter-expression "FS > 200.0" --filter-name "FS200" \
  --filter-expression "QUAL < 30.0" --filter-name "LowQual" \
- -O ${results}/PG250425111536_filtered_indels.vcf
+ -O ${results}/Yoursample_filtered_indels.vcf
 
 
 # ----------------------------
@@ -157,9 +157,9 @@ gatk VariantFiltration \
 echo "STEP 10: Merge SNP & INDEL VCFs"
 
 gatk MergeVcfs \
- -I ${results}/PG250425111536_filtered_snps.vcf \
- -I ${results}/PG250425111536_filtered_indels.vcf \
- -O ${results}/PG250425111536_filtered_all.vcf
+ -I ${results}/Yoursample_filtered_snps.vcf \
+ -I ${results}/Yoursample_filtered_indels.vcf \
+ -O ${results}/Yoursample_filtered_all.vcf
 
 
 # ----------------------------------------
@@ -169,7 +169,7 @@ gatk MergeVcfs \
 echo "STEP 11: Extract only PASS variants"
 
 # Ensure bcftools is installed and accessible
-bcftools view -f PASS ${results}/PG250425111536_filtered_all.vcf -o ${results}/PG250425111536_final_PASS_variants.vcf
+bcftools view -f PASS ${results}/Yoursample_filtered_all.vcf -o ${results}/Yoursample_final_PASS_variants.vcf
 
 echo "Filtering complete. Final PASS variants saved at:"
 echo "${results}/final_PASS_variants.vcf"
